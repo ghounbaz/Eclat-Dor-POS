@@ -7,37 +7,31 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
 
-  // وظيفة لجلب البيانات من Supabase
   const fetchData = async () => {
-    const { data: prods } = await supabase.from('products').select('*');
+    console.log("Fetching fresh data from Supabase...");
+    const { data: prods, error: pError } = await supabase.from('products').select('*').order('name');
     if (prods) setProducts(prods);
     
-    const { data: invs } = await supabase.from('invoices').select('*');
+    const { data: invs, error: iError } = await supabase.from('invoices').select('*').order('created_at', { ascending: false });
     if (invs) setInvoices(invs);
+
+    if (pError || iError) console.error("Error fetching:", pError || iError);
   };
 
-  // وظيفة سحرية لنقل البيانات من LocalStorage لـ Supabase (مرة واحدة فقط)
   const migrateData = async () => {
     const savedProducts = localStorage.getItem("eclat_products");
     if (savedProducts) {
       const localData = JSON.parse(savedProducts);
       if (localData.length > 0) {
-        // كنصيفطو السلعة لـ Supabase
         const { error } = await supabase.from('products').upsert(
           localData.map((p: any) => ({
-            name: p.name,
-            price: p.price,
-            stock: p.stock,
-            category: p.category,
-            barcode: p.barcode
+            name: p.name, price: p.price, stock: p.stock, category: p.category, barcode: p.barcode
           })),
-          { onConflict: 'barcode' } // باش ما يتعاودش نفس الباركود
+          { onConflict: 'barcode' }
         );
-        
         if (!error) {
-          console.log("Migration successful!");
-          localStorage.removeItem("eclat_products"); // كنمسحوها من المتصفح حيت صافي ولات في Cloud
-          fetchData();
+          localStorage.removeItem("eclat_products");
+          await fetchData();
         }
       }
     }
